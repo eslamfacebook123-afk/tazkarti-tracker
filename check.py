@@ -2,7 +2,7 @@ import requests, smtplib, os
 from email.mime.text import MIMEText
 
 URL = "https://tazkarti.com/ar/events?category=basketball"
-KEYWORDS = ["أهلي", "زمالك", "ahly", "zamalek"]
+KEYWORDS = ["أهلي", "زمالك", "ahly", "Pharco"]
 
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
