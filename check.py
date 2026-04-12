@@ -1,8 +1,9 @@
-import requests, smtplib, os
+import requests, smtplib, os, json
 from email.mime.text import MIMEText
 
-API_URL = "https://tazkarti.com/#/matches"
-KEYWORDS = ["Al Ahly", "Pharco FC", "أهلي", "زمالك"]
+API_URL = "https://www.tazkarti.com/data/matches-list-json.json"
+TEAM1 = "al ahly"
+TEAM2 = "zamalek"
 
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
@@ -14,18 +15,23 @@ def send_email(subject, body):
         s.send_message(msg)
 
 def check():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(API_URL, headers=headers, timeout=15)
-    print("Status:", r.status_code)
-    print("Response preview:", r.text[:500])
-    found = any(k in r.text for k in KEYWORDS)
-    if found:
-        send_email(
-            "🎟️ تذاكر الأهلي vs الزمالك نزلت!",
-            "اشتري دلوقتي:\nhttps://tazkarti.com/#/matches"
-        )
-        print("FOUND - email sent!")
-    else:
-        print("Not yet...")
+    r = requests.get(API_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+    matches = json.loads(r.text)
+    for m in matches:
+        t1 = m.get("teamName1", "").lower()
+        t2 = m.get("teamName2", "").lower()
+        game = m.get("tournament", {}).get("nameEn", "").lower()
+        is_ahly_zamalek = (TEAM1 in t1 or TEAM1 in t2) and (TEAM2 in t1 or TEAM2 in t2)
+        is_basket = "basket" in game
+        if is_ahly_zamalek and is_basket:
+            date = m.get("kickOffTime", "")
+            stadium = m.get("stadiumName", "")
+            send_email(
+                "🎟️ تذاكر الأهلي vs الزمالك سلة نزلت!",
+                f"الماتش: {m['teamName1']} vs {m['teamName2']}\nالتاريخ: {date}\nالاستاد: {stadium}\n\nاشتري دلوقتي:\nhttps://tazkarti.com/#/matches"
+            )
+            print("FOUND - email sent!")
+            return
+    print("Not yet - no Ahly vs Zamalek basketball match found")
 
 check()
