@@ -2,8 +2,6 @@ import requests, smtplib, os, json
 from email.mime.text import MIMEText
 
 API_URL = "https://www.tazkarti.com/data/matches-list-json.json"
-TEAM1 = "zamalek"
-TEAM2 = "cr belouizdad"
 
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
@@ -20,13 +18,24 @@ def check():
     for m in matches:
         t1 = m.get("teamName1", "").lower()
         t2 = m.get("teamName2", "").lower()
-        is_match = (TEAM1 in t1 or TEAM1 in t2) and (TEAM2 in t1 or TEAM2 in t2)
-        if is_match:
+        t1ar = m.get("teamNameAr1", "") or ""
+        t2ar = m.get("teamNameAr2", "") or ""
+        stadium = m.get("stadiumName", "").lower()
+        tournament = m.get("tournament", {}).get("nameEn", "").lower()
+
+        is_ahly = "al ahly" in t1 or "al ahly" in t2 or "الأهلي" in t1ar or "الأهلي" in t2ar or "الاهلي" in t1ar or "الاهلي" in t2ar
+        is_zamalek = "zamalek" in t1 or "zamalek" in t2 or "الزمالك" in t1ar or "الزمالك" in t2ar
+        is_basket = "basket" in tournament
+        is_hassan = "hassan moustafa" in stadium or "حسن مصطفى" in stadium or "hassan" in stadium
+
+        if is_ahly and is_zamalek and (is_basket or is_hassan):
             date = m.get("kickOffTime", "")
-            stadium = m.get("stadiumName", "")
             send_email(
-                "🎟️ تذاكر الزمالك vs CR Belouizdad نزلت!",
-                f"الماتش: {m['teamName1']} vs {m['teamName2']}\nالتاريخ: {date}\nالاستاد: {stadium}\n\nاشتري دلوقتي:\nhttps://tazkarti.com/#/matches"
+                "🎟️ تذاكر الأهلي vs الزمالك سلة نزلت — اشتري دلوقتي!",
+                f"الماتش: {m['teamName1']} vs {m['teamName2']}\n"
+                f"التاريخ: {date}\n"
+                f"الاستاد: {m.get('stadiumName', '')}\n\n"
+                f"اشتري دلوقتي:\nhttps://tazkarti.com/#/matches"
             )
             print("FOUND - email sent!")
             return
