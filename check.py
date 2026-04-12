@@ -1,8 +1,8 @@
 import requests, smtplib, os
 from email.mime.text import MIMEText
 
-URL = "https://tazkarti.com/ar/events?category=basketball"
-KEYWORDS = ["أهلي", "زمالك", "ahly", "Pharco"]
+API_URL = "https://tazkarti.com/#/matches"
+KEYWORDS = ["Al Ahly", "Pharco FC", "أهلي", "زمالك"]
 
 def send_email(subject, body):
     msg = MIMEText(body, "plain", "utf-8")
@@ -14,13 +14,15 @@ def send_email(subject, body):
         s.send_message(msg)
 
 def check():
-    r = requests.get(URL, timeout=15,
-        headers={"User-Agent": "Mozilla/5.0"})
+    headers = {"User-Agent": "Mozilla/5.0"}
+    r = requests.get(API_URL, headers=headers, timeout=15)
+    print("Status:", r.status_code)
+    print("Response preview:", r.text[:500])
     found = any(k in r.text for k in KEYWORDS)
     if found:
         send_email(
             "🎟️ تذاكر الأهلي vs الزمالك نزلت!",
-            "اشتري دلوقتي:\nhttps://tazkarti.com/ar/events?category=basketball"
+            "اشتري دلوقتي:\nhttps://tazkarti.com/#/matches"
         )
         print("FOUND - email sent!")
     else:
