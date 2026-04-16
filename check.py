@@ -34,11 +34,11 @@ def check():
         stadium = m.get("stadiumName", "").lower()
         tournament = m.get("tournament", {}).get("nameEn", "").lower()
 
-        is_zed = "zed" in t1 or "zed" in t2 or "زد" in t1ar or "زد" in t2ar
-        is_ismaily = "ismaily" in t1 or "ismaily" in t2 or "الإسماعيلي" in t1ar or "الإسماعيلي" in t2ar or "الاسماعيلي" in t1ar or "الاسماعيلي" in t2ar
+        is_ittihad = "alithad" in t1 or "alithad" in t2 or "ittihad" in t1 or "ittihad" in t2 or "الاتحاد" in t1ar or "الاتحاد" in t2ar
+        is_telecom = "telecom" in t1 or "telecom" in t2 or "تليكوم" in t1ar or "تليكوم" in t2ar
         is_basket = "basket" in tournament or "hassan" in stadium
 
-        if (is_zed or is_ismaily) and is_basket:
+        if (is_ittihad or is_telecom) and is_basket:
             team1_name = m.get("teamNameAr1") or m.get("teamName1", "")
             team2_name = m.get("teamNameAr2") or m.get("teamName2", "")
 
