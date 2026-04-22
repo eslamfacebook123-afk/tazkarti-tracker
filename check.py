@@ -1,10 +1,26 @@
-import requests, smtplib, os, json, csv
+import requests, smtplib, os, json, csv, subprocess
 from email.mime.text import MIMEText
 from io import StringIO
 
-API_URL = "https://www.tazkarti.com/data/matches-list-json.json"
-SHEET_ID = "13bLNp-tCgntsuFh2y335KC677esRL47X0CGGl34uZNI"
+API_URL   = "https://www.tazkarti.com/data/matches-list-json.json"
+SHEET_ID  = "13bLNp-tCgntsuFh2y335KC677esRL47X0CGGl34uZNI"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+SENT_FILE = "sent.json"
+
+def load_sent():
+    if os.path.exists(SENT_FILE):
+        with open(SENT_FILE) as f:
+            return set(json.load(f))
+    return set()
+
+def save_sent(sent_ids):
+    with open(SENT_FILE, "w") as f:
+        json.dump(list(sent_ids), f)
+    subprocess.run(["git", "config", "user.email", "bot@github.com"])
+    subprocess.run(["git", "config", "user.name", "GitHub Bot"])
+    subprocess.run(["git", "add", SENT_FILE])
+    subprocess.run(["git", "commit", "-m", "update sent.json"])
+    subprocess.run(["git", "push"])
 
 def get_emails():
     r = requests.get(SHEET_URL, timeout=15)
@@ -16,50 +32,81 @@ def get_emails():
 def send_email(to, subject, body):
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
-    msg["From"] = os.environ["EMAIL_FROM"]
-    msg["To"] = to
+    msg["From"]    = os.environ["EMAIL_FROM"]
+    msg["To"]      = to
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
         s.login(os.environ["EMAIL_FROM"], os.environ["EMAIL_PASS"])
         s.send_message(msg)
 
 def check():
+    sent_ids = load_sent()
     r = requests.get(API_URL, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
     matches = json.loads(r.text)
+    found_any = False
 
     for m in matches:
-        t1 = m.get("teamName1", "").lower()
-        t2 = m.get("teamName2", "").lower()
-        t1ar = m.get("teamNameAr1", "") or ""
-        t2ar = m.get("teamNameAr2", "") or ""
-        stadium = m.get("stadiumName", "").lower()
-        tournament = m.get("tournament", {}).get("nameEn", "").lower()
+        match_id = str(m.get("matchId", ""))
+        if match_id in sent_ids:
+            print(f"⏭️ ماتش {match_id} بعتنا عليه قبل كده، skip")
+            continue
 
-        is_ittihad = "alithad" in t1 or "alithad" in t2 or "ittihad" in t1 or "ittihad" in t2 or "الاتحاد" in t1ar or "الاتحاد" in t2ar
-        is_telecom = "telecom" in t1 or "telecom" in t2 or "تليكوم" in t1ar or "تليكوم" in t2ar
-        is_basket = "basket" in tournament or "hassan" in stadium
+        t1     = m.get("teamName1", "").lower()
+        t2     = m.get("teamName2", "").lower()
+        t1ar   = m.get("teamNameAr1", "") or ""
+        t2ar   = m.get("teamNameAr2", "") or ""
+        tour   = m.get("tournament", {}).get("nameEn", "").lower()
+        tourar = m.get("tournament", {}).get("nameAr", "") or ""
+        teams  = [t1, t2, t1ar, t2ar]
 
-        if (is_ittihad or is_telecom) and is_basket:
-            team1_name = m.get("teamNameAr1") or m.get("teamName1", "")
-            team2_name = m.get("teamNameAr2") or m.get("teamName2", "")
+        is_ahly = any(
+            x in t for x in ["ahly", "al ahly", "الأهلي", "الاهلي", "الأهلى"]
+            for t in teams
+        )
+        is_pyramids = any(
+            x in t for x in ["pyramid", "pyramids", "بيراميدز"]
+            for t in teams
+        )
+        is_football = (
+            "football" in tour or
+            "soccer" in tour or
+            "كرة القدم" in tourar or
+            "دوري" in tourar or
+            "كأس" in tourar
+        )
+
+        if is_ahly and is_pyramids and is_football:
+            found_any = True
+            name1 = m.get("teamNameAr1") or m.get("teamName1", "")
+            name2 = m.get("teamNameAr2") or m.get("teamName2", "")
+            date  = m.get("kickOffTime", "")
+            venue = m.get("stadiumName", "")
 
             emails = get_emails()
-            print(f"Found! Sending to {len(emails)} emails...")
+            print(f"✅ ماتش {match_id}: {name1} vs {name2} — بنبعت لـ {len(emails)} إيميل...")
 
+            success = True
             for email in emails:
                 try:
                     send_email(
                         email,
-                        "🎟️ تذاكر ماتش سلة نزلت!",
-                        f"الماتش: {team1_name} vs {team2_name}\n"
-                        f"التاريخ: {m.get('kickOffTime', '')}\n"
-                        f"الاستاد: {m.get('stadiumName', '')}\n\n"
-                        f"اشتري دلوقتي:\nhttps://tazkarti.com/#/matches"
+                        "🎟️ تذاكر الأهلي vs بيراميدز نزلت على تذكرتي!",
+                        f"الماتش: {name1} vs {name2}\n"
+                        f"التاريخ: {date}\n"
+                        f"الاستاد: {venue}\n\n"
+                        f"اشتري دلوقتي:\n"
+                        f"https://tazkarti.com/#/matches\n\n"
+                        f"--- تم الإشعار عبر نظام التتبع التلقائي ---"
                     )
-                    print(f"Sent to {email}")
+                    print(f"  ✓ أُرسل إلى {email}")
                 except Exception as e:
-                    print(f"Failed {email}: {e}")
-            return
+                    print(f"  ✗ فشل {email}: {e}")
+                    success = False
 
-    print("Not yet...")
+            if success:
+                sent_ids.add(match_id)
+                save_sent(sent_ids)
+
+    if not found_any:
+        print("لا يوجد ماتشات جديدة...")
 
 check()
